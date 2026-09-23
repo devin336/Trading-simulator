@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradeFlow - Virtual Trading Simulator</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+            },
+            bull: '#10b981',
+            bullLight: 'rgba(16, 185, 129, 0.15)',
+            bear: '#f43f5e',
+            bearLight: 'rgba(244, 63, 94, 0.15)',
+            dark: {
+              950: '#090d16',
+              900: '#0f172a',
+              850: '#131d35',
+              800: '#1e293b',
+              700: '#334155',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #090d16;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Price Flashes */
+    @keyframes flashGreen {
+      0% { background-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+      100% { background-color: transparent; }
+    }
+    @keyframes flashRed {
+      0% { background-color: rgba(244, 63, 94, 0.4); color: #fb7185; }
+      100% { background-color: transparent; }
+    }
+    .flash-up {
+      animation: flashGreen 1s ease-out;
+    }
+    .flash-down {
+      animation: flashRed 1s ease-out;
+    }
+
+    /* Glass Effect */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .glass-panel {
+      background: #0f172a;
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+
+    /* Pulsing Live Dot */
+    .live-pulse {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#090d16] text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#0c1220]/90 backdrop-blur-md px-4 lg:px-6 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="trending-up" class="w-6 h-6 text-slate-950 stroke-[2.5]"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-400 bg-clip-text text-transparent">
+              TradeFlow
+            </h1>
+            <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              SIMULATOR
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 live-pulse"></span>
+            Live Simulated Market Feed
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Ribbon -->
+      <div class="hidden xl:flex items-center gap-6 bg-slate-900/80 border border-slate-800 rounded-xl px-5 py-2">
+        <div>
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Net Worth</span>
+          <div id="nav-net-worth" class="text-sm font-bold font-mono text-white">$10,000.00</div>
+        </div>
+        <div class="w-px h-7 bg-slate-800"></div>
+        <div>
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Cash Balance</span>
+          <div id="nav-cash" class="text-sm font-bold font-mono text-emerald-400">$10,000.00</div>
+        </div>
+        <div class="w-px h-7 bg-slate-800"></div>
+        <div>
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Total P&L</span>
+          <div id="nav-pnl" class="text-sm font-bold font-mono text-slate-300">$0.00 (+0.00%)</div>
+        </div>
+      </div>
+
+      <!-- Controls & Actions -->
+      <div class="flex items-center gap-2.5">
+        <!-- Simulation Speed Selector -->
+        <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
+          <span class="text-slate-400 px-2 hidden sm:inline text-[11px] font-medium">Speed:</span>
+          <button onclick="setSimSpeed(0)" id="spd-btn-0" class="px-2 py-1 rounded text-slate-400 hover:text-white font-medium transition">⏸</button>
+          <button onclick="setSimSpeed(1)" id="spd-btn-1" class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 transition">1x</button>
+          <button onclick="setSimSpeed(2)" id="spd-btn-2" class="px-2 py-1 rounded text-slate-400 hover:text-white font-medium transition">2x</button>
+          <button onclick="setSimSpeed(5)" id="spd-btn-5" class="px-2 py-1 rounded text-slate-400 hover:text-white font-medium transition">5x</button>
+        </div>
+
+        <!-- Sound Toggle -->
+        <button id="sound-toggle-btn" onclick="toggleSound()" title="Toggle Sound FX" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700 transition">
+          <i data-lucide="volume-2" id="sound-icon" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Reset Simulation -->
+        <button onclick="confirmReset()" title="Reset Modal ke $10,000" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-xs font-semibold transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Reset</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================= MAIN APP CONTAINER ================= -->
+  <main class="flex-1 p-3 sm:p-4 lg:p-5 max-w-[1680px] w-full mx-auto space-y-4">
+    
+    <!-- ROW 1: STATS OVERVIEW CARDS -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <!-- Card 1: Total Net Worth -->
+      <div class="glass-card rounded-2xl p-4 relative overflow-hidden group hover:border-slate-700 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Kekayaan (Net Worth)</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+            <i data-lucide="wallet" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div id="stat-net-worth" class="text-2xl font-black font-mono tracking-tight text-white">$10,000.00</div>
+          <div id="stat-net-worth-change" class="text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1">
+            <span>Modal Virtual Awal: $10,000.00</span>
+          </div>
+        </div>
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition"></div>
+      </div>
+
+      <!-- Card 2: Cash Balance -->
+      <div class="glass-card rounded-2xl p-4 relative overflow-hidden group hover:border-slate-700 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Saldo Kas (Cash)</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+            <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div id="stat-cash" class="text-2xl font-black font-mono tracking-tight text-emerald-400">$10,000.00</div>
+          <div class="text-xs font-semibold text-slate-400 mt-1 flex items-center justify-between">
+            <span>Tersedia untuk beli</span>
+            <span id="stat-cash-percent" class="font-mono text-slate-300">100.0%</span>
+          </div>
+        </div>
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition"></div>
+      </div>
+
+      <!-- Card 3: Invested Portfolio Value -->
+      <div class="glass-card rounded-2xl p-4 relative overflow-hidden group hover:border-slate-700 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nilai Aset Portofolio</span>
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div id="stat-portfolio-val" class="text-2xl font-black font-mono tracking-tight text-cyan-300">$0.00</div>
+          <div class="text-xs font-semibold text-slate-400 mt-1 flex items-center justify-between">
+            <span>Posisi Terbuka</span>
+            <span id="stat-open-positions" class="font-mono text-slate-300">0 Aset</span>
+          </div>
+        </div>
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl group-hover:bg-cyan-500/10 transition"></div>
+      </div>
+
+      <!-- Card 4: Total Unrealized P&L -->
+      <div class="glass-card rounded-2xl p-4 relative overflow-hidden group hover:border-slate-700 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Profit / Loss</span>
+          <div id="stat-pnl-icon-bg" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center border border-slate-700">
+            <i data-lucide="activity" class="w-4 h-4" id="stat-pnl-icon"></i>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div id="stat-total-pnl" class="text-2xl font-black font-mono tracking-tight text-slate-300">$0.00</div>
+          <div id="stat-pnl-badge" class="text-xs font-bold font-mono mt-1 text-slate-400 flex items-center gap-1">
+            <span>0.00% Return</span>
+          </div>
+        </div>
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-slate-500/5 rounded-full blur-xl transition"></div>
+      </div>
+    </section>
+
+    <!-- ROW 2: MAIN TRADING WORKSPACE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      
+      <!-- LEFT COLUMN: MARKET WATCH (3 cols on large screen) -->
+      <div class="lg:col-span-3 flex flex-col glass-card rounded-2xl overflow-hidden border border-slate-800 h-[640px]">
+        <!-- Market Watch Header -->
+        <div class="p-3.5 border-b border-slate-800/80 bg-slate-900/50 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
+              <h2 class="text-sm font-bold text-white tracking-wide">Market Watch</h2>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono" id="market-update-indicator">Tick: 1.5s</span>
+          </div>
+
+          <!-- Search & Filter Category -->
+          <div class="space-y-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+              <input 
+                type="text" 
+                id="asset-search-input" 
+                placeholder="Cari aset (BTC, AAPL...)" 
+                class="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition font-sans"
+                oninput="filterAssets()"
+              />
+            </div>
+            <div class="flex gap-1 bg-slate-950/60 p-0.5 rounded-lg border border-slate-800/70 text-xs">
+              <button onclick="setCategoryFilter('all')" id="tab-cat-all" class="flex-1 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-white transition">Semua</button>
+              <button onclick="setCategoryFilter('crypto')" id="tab-cat-crypto" class="flex-1 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition">Crypto</button>
+              <button onclick="setCategoryFilter('stock')" id="tab-cat-stock" class="flex-1 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition">Saham</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Asset List Items -->
+        <div id="asset-list-container" class="flex-1 overflow-y-auto divide-y divide-slate-800/40 p-1.5 space-y-1">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- CENTER & RIGHT: CHART & ORDER FORM (9 cols on large screen) -->
+      <div class="lg:col-span-9 grid grid-cols-1 xl:grid-cols-12 gap-4">
+        
+        <!-- CHART & ACTIVE ASSET HERO (8 cols on xl) -->
+        <div class="xl:col-span-8 glass-card rounded-2xl p-4 flex flex-col h-[640px] border border-slate-800">
+          
+          <!-- Active Asset Header Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+              <div id="active-asset-icon" class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-lg text-emerald-400 font-mono shadow-inner">
+                ₿
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 id="active-asset-symbol" class="text-lg font-black tracking-tight text-white font-mono">BTC/USD</h3>
+                  <span id="active-asset-category" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    CRYPTO
+                  </span>
+                </div>
+                <div id="active-asset-name" class="text-xs text-slate-400">Bitcoin</div>
+              </div>
+            </div>
+
+            <!-- Price & Change Statistics -->
+            <div class="flex items-center gap-4 text-right">
+              <div>
+                <div id="active-asset-price" class="text-2xl font-black font-mono tracking-tight text-white transition-all">$64,250.00</div>
+                <div class="flex items-center justify-end gap-1.5 text-xs font-mono font-bold" id="active-asset-change-wrapper">
+                  <span id="active-asset-change" class="text-emerald-400">+2.45%</span>
+                  <span id="active-asset-change-amt" class="text-emerald-400 font-normal">(+$1,530.00)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Market Specs Bar -->
+          <div class="grid grid-cols-3 gap-2 py-2 px-3 my-2 bg-slate-900/60 rounded-xl border border-slate-800/60 text-xs">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase block">24h High</span>
+              <span id="spec-24h-high" class="font-mono font-bold text-slate-200 text-xs">$65,800.00</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase block">24h Low</span>
+              <span id="spec-24h-low" class="font-mono font-bold text-slate-200 text-xs">$62,100.00</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase block">24h Volume (Sim)</span>
+              <span id="spec-24h-vol" class="font-mono font-bold text-slate-200 text-xs">$1.24B</span>
+            </div>
+          </div>
+
+          <!-- Chart Controls & Timeframe -->
+          <div class="flex items-center justify-between py-1.5 text-xs">
+            <div class="flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-slate-800 text-[11px]">
+              <button onclick="setTimeframe('1M')" id="tf-1M" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">1M</button>
+              <button onclick="setTimeframe('5M')" id="tf-5M" class="px-2.5 py-1 rounded-md font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition">Live Realtime</button>
+              <button onclick="setTimeframe('1H')" id="tf-1H" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">1H</button>
+              <button onclick="setTimeframe('1D')" id="tf-1D" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">1D</button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-slate-400 hidden sm:inline flex items-center gap-1">
+                <i data-lucide="line-chart" class="w-3.5 h-3.5 text-emerald-400"></i> Interactive Chart
+              </span>
+            </div>
+          </div>
+
+          <!-- Interactive Chart Canvas -->
+          <div class="flex-1 w-full relative min-h-0 pt-2">
+            <canvas id="tradingChart" class="w-full h-full"></canvas>
+          </div>
+        </div>
+
+        <!-- ORDER FORM (4 cols on xl) -->
+        <div class="xl:col-span-4 glass-card rounded-2xl p-4 flex flex-col justify-between h-[640px] border border-slate-800">
+          
+          <div class="space-y-4">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+                <h3 class="text-sm font-bold text-white tracking-wide">Eksekusi Order</h3>
+              </div>
+              <span class="text-[11px] font-mono text-slate-400">Market Order</span>
+            </div>
+
+            <!-- Buy / Sell Action Switch Tabs -->
+            <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+              <button 
+                id="btn-tab-buy" 
+                onclick="setTradeMode('BUY')"
+                class="py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+              >
+                <i data-lucide="arrow-down-left" class="w-3.5 h-3.5 stroke-[3]"></i> Beli (Buy)
+              </button>
+              <button 
+                id="btn-tab-sell" 
+                onclick="setTradeMode('SELL')"
+                class="py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all text-slate-400 hover:text-white flex items-center justify-center gap-1.5"
+              >
+                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 stroke-[3]"></i> Jual (Sell)
+              </button>
+            </div>
+
+            <!-- Available Balance or Owned Units Badge -->
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+              <span id="label-available-balance" class="text-slate-400">Kas Tersedia:</span>
+              <span id="val-available-balance" class="font-mono font-bold text-emerald-400">$10,000.00</span>
+            </div>
+
+            <!-- Input Mode Selector (By USD or by Units) -->
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="font-medium text-[11px]">Tipe Input:</span>
+              <div class="flex items-center gap-2 font-medium">
+                <label class="cursor-pointer flex items-center gap-1">
+                  <input type="radio" name="input-type" value="USD" checked onchange="switchInputType('USD')" class="accent-emerald-500">
+                  <span>Nominal ($)</span>
+                </label>
+                <label class="cursor-pointer flex items-center gap-1">
+                  <input type="radio" name="input-type" value="UNIT" onchange="switchInputType('UNIT')" class="accent-emerald-500">
+                  <span>Jumlah Unit</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Amount Input Field -->
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block" id="label-amount-input">
+                Nominal Transaksi (USD)
+              </label>
+              <div class="relative">
+                <span id="input-prefix" class="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-slate-400">$</span>
+                <input 
+                  type="number" 
+                  id="trade-amount-input" 
+                  step="any" 
+                  placeholder="0.00" 
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-16 py-2.5 text-base font-mono font-bold text-white focus:outline-none focus:border-emerald-500 transition"
+                  oninput="calculateOrderDetails()"
+                />
+                <button 
+                  type="button" 
+                  onclick="setTradeMax()" 
+                  class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-emerald-400 font-mono transition"
+                >
+                  MAX
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Percentage Buttons (25%, 50%, 75%, 100%) -->
+            <div class="grid grid-cols-4 gap-1.5">
+              <button onclick="setTradePercent(0.25)" class="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-[11px] font-semibold transition">25%</button>
+              <button onclick="setTradePercent(0.50)" class="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-[11px] font-semibold transition">50%</button>
+              <button onclick="setTradePercent(0.75)" class="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-[11px] font-semibold transition">75%</button>
+              <button onclick="setTradePercent(1.00)" class="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-[11px] font-semibold transition">100%</button>
+            </div>
+
+            <!-- Order Summary Calculations -->
+            <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-xs font-mono">
+              <div class="flex justify-between text-slate-400">
+                <span>Harga Pasar:</span>
+                <span id="summary-market-price" class="text-slate-200 font-bold">$0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span id="summary-units-label">Estimasi Unit Didapat:</span>
+                <span id="summary-units-val" class="text-slate-200 font-bold">0.000000</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Biaya Transaksi (Simulasi):</span>
+                <span class="text-emerald-400 font-bold">$0.00 (Gratis)</span>
+              </div>
+              <div class="border-t border-slate-800/80 pt-2 flex justify-between text-sm">
+                <span class="text-slate-300 font-sans font-bold">Total Nilai:</span>
+                <span id="summary-total-cost" class="text-white font-black">$0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Order Button -->
+          <div class="pt-3 space-y-2">
+            <button 
+              id="btn-execute-order" 
+              onclick="executeTradeOrder()" 
+              class="w-full py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span id="btn-execute-text">Beli BTC</span>
+            </button>
+            <p id="order-validation-msg" class="text-[11px] text-center text-slate-500 min-h-[16px] font-medium"></p>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ROW 3: TABBED PORTFOLIO & TRANSACTION HISTORY TABLE -->
+    <section class="glass-card rounded-2xl border border-slate-800 overflow-hidden">
+      
+      <!-- Tabs Header -->
+      <div class="flex flex-wrap items-center justify-between border-b border-slate-800 px-4 pt-2 bg-slate-900/40">
+        <div class="flex gap-2">
+          <button 
+            onclick="switchBottomTab('portfolio')" 
+            id="tab-btn-portfolio" 
+            class="px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition"
+          >
+            <i data-lucide="briefcase" class="w-4 h-4"></i>
+            Portofolio Saya (<span id="tab-portfolio-count">0</span>)
+          </button>
+          <button 
+            onclick="switchBottomTab('history')" 
+            id="tab-btn-history" 
+            class="px-4 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition"
+          >
+            <i data-lucide="history" class="w-4 h-4"></i>
+            Riwayat Transaksi (<span id="tab-history-count">0</span>)
+          </button>
+          <button 
+            onclick="switchBottomTab('analytics')" 
+            id="tab-btn-analytics" 
+            class="px-4 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition"
+          >
+            <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+            Statistik Performa
+          </button>
+        </div>
+
+        <div class="py-2 text-xs text-slate-400 flex items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>Portofolio ter-update otomatis saat harga bergerak</span>
+        </div>
+      </div>
+
+      <!-- Tab Content 1: Portfolio Holdings Table -->
+      <div id="panel-portfolio" class="p-4 overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="text-slate-400 uppercase text-[11px] border-b border-slate-800/80 pb-2">
+              <th class="pb-3 font-semibold">Aset</th>
+              <th class="pb-3 font-semibold">Jumlah Unit</th>
+              <th class="pb-3 font-semibold">Harga Rata-Rata Beli</th>
+              <th class="pb-3 font-semibold">Harga Saat Ini</th>
+              <th class="pb-3 font-semibold">Total Nilai Pasar</th>
+              <th class="pb-3 font-semibold">Profit / Loss (P&L)</th>
+              <th class="pb-3 font-semibold text-right">Aksi Cepat</th>
+            </tr>
+          </thead>
+          <tbody id="portfolio-table-body" class="divide-y divide-slate-800/40 font-mono">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+        
+        <!-- Empty Portfolio State -->
+        <div id="portfolio-empty-state" class="hidden py-12 text-center space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-slate-800/80 text-slate-500 mx-auto flex items-center justify-center">
+            <i data-lucide="inbox" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-slate-300">Belum Ada Aset di Portofolio</h4>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Pilih aset dari daftar Market Watch di atas dan lakukan pembelian pertama menggunakan modal $10,000 Anda.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: History Table -->
+      <div id="panel-history" class="hidden p-4 overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="text-slate-400 uppercase text-[11px] border-b border-slate-800/80 pb-2">
+              <th class="pb-3 font-semibold">Waktu</th>
+              <th class="pb-3 font-semibold">Tipe</th>
+              <th class="pb-3 font-semibold">Aset</th>
+              <th class="pb-3 font-semibold">Harga Eksekusi</th>
+              <th class="pb-3 font-semibold">Jumlah Unit</th>
+              <th class="pb-3 font-semibold">Total Nominal ($)</th>
+              <th class="pb-3 font-semibold text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body" class="divide-y divide-slate-800/40 font-mono">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+
+        <!-- Empty History State -->
+        <div id="history-empty-state" class="hidden py-12 text-center space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-slate-800/80 text-slate-500 mx-auto flex items-center justify-center">
+            <i data-lucide="clock" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-slate-300">Belum Ada Riwayat Transaksi</h4>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Setiap aktivitas transaksi Buy atau Sell yang berhasil akan tercatat secara lengkap di sini.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Analytics / Performance Statistics -->
+      <div id="panel-analytics" class="hidden p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-xs text-slate-400 uppercase font-semibold">Total Transaksi Selesai</span>
+            <div id="stat-total-trades" class="text-2xl font-bold font-mono text-white mt-1">0 Transaksi</div>
+            <p class="text-xs text-slate-500 mt-1">Aktivitas eksekusi order trading</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-xs text-slate-400 uppercase font-semibold">Realized Profit / Loss</span>
+            <div id="stat-realized-pnl" class="text-2xl font-bold font-mono text-slate-300 mt-1">$0.00</div>
+            <p class="text-xs text-slate-500 mt-1">Keuntungan/kerugian yang sudah direalisasikan</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-xs text-slate-400 uppercase font-semibold">Aset Paling Menguntungkan</span>
+            <div id="stat-best-asset" class="text-2xl font-bold font-mono text-emerald-400 mt-1">-</div>
+            <p class="text-xs text-slate-500 mt-1">Berdasarkan unrealized profit tertinggi</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-4 px-4 text-center text-xs text-slate-500">
+    <div class="flex flex-wrap items-center justify-between max-w-[1680px] mx-auto gap-2">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-slate-400">TradeFlow Simulator v1.0</span>
+        <span>•</span>
+        <span>Simulasi Pasar Saham & Crypto Fiktif (Uang Virtual)</span>
+      </div>
+      <div class="text-slate-500">
+        Data pasar disimulasikan menggunakan model volatilitas acak secara real-time.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= TOAST NOTIFICATION CONTAINER ================= -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
+
+  <!-- ================= CONFIRM RESET MODAL ================= -->
+  <div id="reset-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="glass-card rounded-2xl border border-slate-700 max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+      </div>
+      <div class="text-center space-y-1">
+        <h3 class="text-lg font-black text-white">Reset Semua Data Simulasi?</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Tindakan ini akan mengembalikan saldo kas Anda ke modal awal <strong>$10,000.00</strong>, mengosongkan semua kepemilikan aset di portofolio, dan menghapus seluruh riwayat transaksi.
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <button onclick="closeResetModal()" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+          Batal
+        </button>
+        <button onclick="executeResetAll()" class="py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-500/25 transition">
+          Ya, Reset Akun
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // --- 1. INITIAL ASSET DEFINITIONS ---
+    const DEFAULT_ASSETS = [
+      { id: 'btc', symbol: 'BTC/USD', name: 'Bitcoin', category: 'crypto', icon: '₿', basePrice: 64250.00, price: 64250.00, changePercent: 2.45, high24: 65800.00, low24: 62100.00, volume: '$28.4B', volatility: 0.004, history: [] },
+      { id: 'eth', symbol: 'ETH/USD', name: 'Ethereum', category: 'crypto', icon: 'Ξ', basePrice: 3480.00, price: 3480.00, changePercent: 1.82, high24: 3560.00, low24: 3390.00, volume: '$14.2B', volatility: 0.005, history: [] },
+      { id: 'sol', symbol: 'SOL/USD', name: 'Solana', category: 'crypto', icon: '◎', basePrice: 148.50, price: 148.50, changePercent: 4.12, high24: 154.20, low24: 141.00, volume: '$4.1B', volatility: 0.007, history: [] },
+      { id: 'bnb', symbol: 'BNB/USD', name: 'Binance Coin', category: 'crypto', icon: 'B', basePrice: 575.20, price: 575.20, changePercent: -0.65, high24: 588.00, low24: 569.00, volume: '$1.8B', volatility: 0.004, history: [] },
+      { id: 'aapl', symbol: 'AAPL', name: 'Apple Inc.', category: 'stock', icon: '', basePrice: 228.30, price: 228.30, changePercent: 0.85, high24: 230.10, low24: 226.50, volume: '$9.8B', volatility: 0.002, history: [] },
+      { id: 'tsla', symbol: 'TSLA', name: 'Tesla Inc.', category: 'stock', icon: 'T', basePrice: 245.60, price: 245.60, changePercent: -2.14, high24: 254.00, low24: 242.10, volume: '$12.5B', volatility: 0.006, history: [] },
+      { id: 'nvda', symbol: 'NVDA', name: 'NVIDIA Corp.', category: 'stock', icon: 'N', basePrice: 118.90, price: 118.90, changePercent: 3.25, high24: 121.50, low24: 115.80, volume: '$18.2B', volatility: 0.005, history: [] },
+      { id: 'googl', symbol: 'GOOGL', name: 'Alphabet Inc.', category: 'stock', icon: 'G', basePrice: 178.40, price: 178.40, changePercent: 0.42, high24: 180.20, low24: 176.90, volume: '$4.6B', volatility: 0.0025, history: [] },
+    ];
+
+    const INITIAL_MODAL = 10000.00;
+
+    // --- 2. APPLICATION STATE ---
+    let state = {
+      cash: INITIAL_MODAL,
+      portfolio: {}, // { 'btc': { units: 0.5, totalSpent: 30000, avgPrice: 60000 } }
+      history: [],   // [ { id, timestamp, type: 'BUY'|'SELL', assetId, symbol, price, units, totalUsd } ]
+      realizedPnl: 0,
+      activeAssetId: 'btc',
+      tradeMode: 'BUY',     // 'BUY' or 'SELL'
+      inputType: 'USD',     // 'USD' or 'UNIT'
+      categoryFilter: 'all',// 'all' | 'crypto' | 'stock'
+      simSpeed: 1,          // 0 = paused, 1 = 1x, 2 = 2x, 5 = 5x
+      soundEnabled: true,
+      assets: []
+    };
+
+    let chartInstance = null;
+    let priceUpdateInterval = null;
+
+    // Web Audio Sound Synthesizer (No external audio files needed)
+    function playBeep(type = 'buy') {
+      if (!state.soundEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'buy') {
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+          osc.frequency.exponentialRampToValueAtTime(880.00, ctx.currentTime + 0.15); // A5
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.2);
+        } else if (type === 'sell') {
+          osc.frequency.setValueAtTime(880.00, ctx.currentTime); // A5
+          osc.frequency.exponentialRampToValueAtTime(587.33, ctx.currentTime + 0.15); // D5
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.2);
+        } else if (type === 'error') {
+          osc.frequency.setValueAtTime(220.00, ctx.currentTime);
+          osc.frequency.setValueAtTime(180.00, ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.25);
+        }
+      } catch (e) {
+        // AudioContext might be blocked until user gesture
+      }
+    }
+
+    // --- 3. PERSISTENCE (LocalStorage) ---
+    function saveState() {
+      try {
+        const dataToSave = {
+          cash: state.cash,
+          portfolio: state.portfolio,
+          history: state.history,
+          realizedPnl: state.realizedPnl,
+          activeAssetId: state.activeAssetId,
+          soundEnabled: state.soundEnabled
+        };
+        localStorage.setItem('tradeflow_sim_state', JSON.stringify(dataToSave));
+      } catch (e) {
+        console.warn('Could not save to localStorage:', e);
+      }
+    }
+
+    function loadState() {
+      // Pre-seed assets historical candle/line points
+      state.assets = JSON.parse(JSON.stringify(DEFAULT_ASSETS));
+      state.assets.forEach(asset => {
+        let current = asset.price;
+        asset.history = [];
+        const now = Date.now();
+        // Generate 35 initial historical points
+        for (let i = 35; i >= 0; i--) {
+          const time = new Date(now - i * 5000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const noise = (Math.random() - 0.49) * asset.price * (asset.volatility * 0.8);
+          current = Math.max(current + noise, asset.price * 0.5);
+          asset.history.push({ time, price: current });
+        }
+        asset.price = current;
+      });
+
+      try {
+        const saved = localStorage.getItem('tradeflow_sim_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          state.cash = typeof parsed.cash === 'number' ? parsed.cash : INITIAL_MODAL;
+          state.portfolio = parsed.portfolio || {};
+          state.history = parsed.history || [];
+          state.realizedPnl = parsed.realizedPnl || 0;
+          if (parsed.activeAssetId) state.activeAssetId = parsed.activeAssetId;
+          if (typeof parsed.soundEnabled === 'boolean') state.soundEnabled = parsed.soundEnabled;
+        }
+      } catch (e) {
+        console.warn('Could not parse localStorage:', e);
+      }
+    }
+
+    // --- 4. FORMATTERS ---
+    const formatUSD = (val, maxDec = 2) => {
+      if (val === null || val === undefined || isNaN(val)) return '$0.00';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: maxDec
+      }).format(val);
+    };
+
+    const formatNumber = (val, dec = 6) => {
+      if (isNaN(val)) return '0';
+      return Number(val).toLocaleString('en-US', { maximumFractionDigits: dec });
+    };
+
+    // --- 5. REAL-TIME MARKET ENGINE ---
+    function startPriceEngine() {
+      if (priceUpdateInterval) clearInterval(priceUpdateInterval);
+      
+      const intervalMs = state.simSpeed === 0 ? 999999999 : Math.floor(1500 / state.simSpeed);
+      
+      if (state.simSpeed > 0) {
+        priceUpdateInterval = setInterval(() => {
+          updateMarketPrices();
+        }, intervalMs);
+      }
+    }
+
+    function updateMarketPrices() {
+      if (state.simSpeed === 0) return;
+
+      state.assets.forEach(asset => {
+        const oldPrice = asset.price;
+        // Geometric Random Walk with subtle mean reversion
+        const drift = (asset.basePrice - asset.price) * 0.001; 
+        const randomFactor = (Math.random() - 0.495) * 2;
+        const change = (asset.price * asset.volatility * randomFactor) + drift;
+        
+        asset.price = Math.max(0.01, asset.price + change);
+        
+        // Update 24h high/low
+        if (asset.price > asset.high24) asset.high24 = asset.price;
+        if (asset.price < asset.low24) asset.low24 = asset.price;
+
+        // Update 24h percentage change from base
+        asset.changePercent = ((asset.price - asset.basePrice) / asset.basePrice) * 100;
+
+        // Append to history queue (keep last 40 points)
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        asset.history.push({ time, price: asset.price });
+        if (asset.history.length > 45) {
+          asset.history.shift();
+        }
+
+        // Trigger flash in UI
+        const isUp = asset.price >= oldPrice;
+        triggerPriceFlash(asset.id, isUp);
+      });
+
+      renderMarketWatch();
+      updateActiveAssetHeader();
+      updateDashboardStats();
+      renderPortfolioTable();
+      updateChartLive();
+    }
+
+    function triggerPriceFlash(assetId, isUp) {
+      const el = document.getElementById(`price-val-${assetId}`);
+      if (el) {
+        el.classList.remove('flash-up', 'flash-down');
+        void el.offsetWidth; // trigger reflow
+        el.classList.add(isUp ? 'flash-up' : 'flash-down');
+      }
+      if (assetId === state.activeAssetId) {
+        const headerPrice = document.getElementById('active-asset-price');
+        if (headerPrice) {
+          headerPrice.classList.remove('flash-up', 'flash-down');
+          void headerPrice.offsetWidth;
+          headerPrice.classList.add(isUp ? 'flash-up' : 'flash-down');
+        }
+      }
+    }
+
+    // --- 6. CHART.JS SETUP & STREAMING ---
+    function initChart() {
+      const ctx = document.getElementById('tradingChart').getContext('2d');
+      const activeAsset = getActiveAsset();
+
+      // Create rich gradient fill
+      const gradient = ctx.createLinearGradient(0, 0, 0, 380);
+      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+      gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: activeAsset.history.map(h => h.time),
+          datasets: [{
+            label: `${activeAsset.symbol} Price`,
+            data: activeAsset.history.map(h => h.price),
+            borderColor: '#10b981',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#10b981',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
+            tension: 0.25,
+            fill: true,
+            backgroundColor: gradient,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          interaction: {
+            intersect: false,
+            mode: 'index',
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: '#94a3b8',
+              bodyColor: '#10b981',
+              bodyFont: { family: 'JetBrains Mono', weight: 'bold', size: 13 },
+              titleFont: { family: 'Inter', size: 11 },
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              callbacks: {
+                label: function(context) {
+                  return `Price: ${formatUSD(context.parsed.y, 4)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
+              ticks: { color: '#64748b', maxTicksLimit: 7, font: { size: 10, family: 'Inter' } }
+            },
+            y: {
+              position: 'right',
+              grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
+              ticks: {
+                color: '#64748b',
+                font: { size: 11, family: 'JetBrains Mono' },
+                callback: function(value) {
+                  return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChartLive() {
+      if (!chartInstance) return;
+      const activeAsset = getActiveAsset();
+      
+      const isBull = activeAsset.changePercent >= 0;
+      const themeColor = isBull ? '#10b981' : '#f43f5e';
+      
+      const ctx = document.getElementById('tradingChart').getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 380);
+      gradient.addColorStop(0, isBull ? 'rgba(16, 185, 129, 0.35)' : 'rgba(244, 63, 94, 0.35)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      chartInstance.data.labels = activeAsset.history.map(h => h.time);
+      chartInstance.data.datasets[0].data = activeAsset.history.map(h => h.price);
+      chartInstance.data.datasets[0].borderColor = themeColor;
+      chartInstance.data.datasets[0].backgroundColor = gradient;
+      chartInstance.data.datasets[0].pointHoverBackgroundColor = themeColor;
+      chartInstance.options.plugins.tooltip.bodyColor = themeColor;
+      chartInstance.update('none'); // silent update for performance
+    }
+
+    function switchChartAsset() {
+      if (!chartInstance) return;
+      const activeAsset = getActiveAsset();
+      chartInstance.data.labels = activeAsset.history.map(h => h.time);
+      chartInstance.data.datasets[0].label = `${activeAsset.symbol} Price`;
+      chartInstance.data.datasets[0].data = activeAsset.history.map(h => h.price);
+      updateChartLive();
+      chartInstance.update();
+    }
+
+    // --- 7. MARKET WATCH RENDERING ---
+    function renderMarketWatch() {
+      const container = document.getElementById('asset-list-container');
+      const searchTerm = (document.getElementById('asset-search-input')?.value || '').toLowerCase().trim();
+      
+      const filtered = state.assets.filter(asset => {
+        const matchesCategory = state.categoryFilter === 'all' || asset.category === state.categoryFilter;
+        const matchesSearch = asset.symbol.toLowerCase().includes(searchTerm) || asset.name.toLowerCase().includes(searchTerm);
+        return matchesCategory && matchesSearch;
+      });
+
+      container.innerHTML = filtered.map(asset => {
+        const isActive = asset.id === state.activeAssetId;
+        const isUp = asset.changePercent >= 0;
+        const activeClass = isActive 
+          ? 'bg-slate-800/90 border-emerald-500/60 shadow-lg shadow-emerald-950/40' 
+          : 'bg-slate-900/40 border-transparent hover:bg-slate-800/50 hover:border-slate-800';
+
+        return `
+          <div 
+            onclick="selectAsset('${asset.id}')"
+            class="flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${activeClass} group"
+          >
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-xs font-mono text-slate-200 border border-slate-700/80 group-hover:border-slate-600">
+                ${asset.icon}
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono font-bold text-xs text-white">${asset.symbol}</span>
+                </div>
+                <span class="text-[10px] text-slate-400 truncate max-w-[90px] block">${asset.name}</span>
+              </div>
+            </div>
+
+            <div class="text-right font-mono">
+              <div id="price-val-${asset.id}" class="text-xs font-bold text-white transition-colors">
+                ${formatUSD(asset.price, asset.price < 10 ? 4 : 2)}
+              </div>
+              <div class="text-[10px] font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'} flex items-center justify-end gap-0.5">
+                ${isUp ? '▲' : '▼'} ${Math.abs(asset.changePercent).toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function selectAsset(assetId) {
+      state.activeAssetId = assetId;
+      saveState();
+      renderMarketWatch();
+      updateActiveAssetHeader();
+      switchChartAsset();
+      calculateOrderDetails();
+      updateOrderButtonLabel();
+    }
+
+    function setCategoryFilter(category) {
+      state.categoryFilter = category;
+      ['all', 'crypto', 'stock'].forEach(cat => {
+        const btn = document.getElementById(`tab-cat-${cat}`);
+        if (btn) {
+          if (cat === category) {
+            btn.className = 'flex-1 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-white transition';
+          } else {
+            btn.className = 'flex-1 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition';
+          }
+        }
+      });
+      renderMarketWatch();
+    }
+
+    function filterAssets() {
+      renderMarketWatch();
+    }
+
+    // --- 8. ACTIVE ASSET HEADER & FORM SYNC ---
+    function getActiveAsset() {
+      return state.assets.find(a => a.id === state.activeAssetId) || state.assets[0];
+    }
+
+    function updateActiveAssetHeader() {
+      const asset = getActiveAsset();
+      if (!asset) return;
+
+      document.getElementById('active-asset-icon').innerText = asset.icon;
+      document.getElementById('active-asset-symbol').innerText = asset.symbol;
+      document.getElementById('active-asset-name').innerText = asset.name;
+      document.getElementById('active-asset-category').innerText = asset.category.toUpperCase();
+      
+      const priceEl = document.getElementById('active-asset-price');
+      priceEl.innerText = formatUSD(asset.price, asset.price < 10 ? 4 : 2);
+
+      const changeEl = document.getElementById('active-asset-change');
+      const changeAmtEl = document.getElementById('active-asset-change-amt');
+      const isUp = asset.changePercent >= 0;
+      const dollarDiff = asset.price - asset.basePrice;
+
+      changeEl.className = isUp ? 'text-emerald-400' : 'text-rose-400';
+      changeAmtEl.className = isUp ? 'text-emerald-400/80 font-normal' : 'text-rose-400/80 font-normal';
+      
+      changeEl.innerText = `${isUp ? '+' : ''}${asset.changePercent.toFixed(2)}%`;
+      changeAmtEl.innerText = `(${isUp ? '+' : '-'}${formatUSD(Math.abs(dollarDiff))})`;
+
+      document.getElementById('spec-24h-high').innerText = formatUSD(asset.high24);
+      document.getElementById('spec-24h-low').innerText = formatUSD(asset.low24);
+      document.getElementById('spec-24h-vol').innerText = asset.volume;
+
+      // Update Form available display
+      updateOrderFormAvailableBalance();
+      updateOrderButtonLabel();
+    }
+
+    // --- 9. DASHBOARD STATS & CALCULATIONS ---
+    function updateDashboardStats() {
+      let totalPortfolioVal = 0;
+      let totalUnrealizedPnl = 0;
+      let totalInitialCost = 0;
+      let openPositionsCount = 0;
+      let bestAsset = null;
+      let maxAssetProfit = -Infinity;
+
+      Object.entries(state.portfolio).forEach(([assetId, pos]) => {
+        if (pos.units > 0.000001) {
+          openPositionsCount++;
+          const asset = state.assets.find(a => a.id === assetId);
+          if (asset) {
+            const currentVal = pos.units * asset.price;
+            const costVal = pos.units * pos.avgPrice;
+            const pnl = currentVal - costVal;
+            
+            totalPortfolioVal += currentVal;
+            totalInitialCost += costVal;
+            totalUnrealizedPnl += pnl;
+
+            if (pnl > maxAssetProfit) {
+              maxAssetProfit = pnl;
+              bestAsset = asset.symbol;
+            }
+          }
+        }
+      });
+
+      const netWorth = state.cash + totalPortfolioVal;
+      const totalReturn = netWorth - INITIAL_MODAL;
+      const totalReturnPercent = ((netWorth - INITIAL_MODAL) / INITIAL_MODAL) * 100;
+      const isProfit = totalReturn >= 0;
+
+      // Top ribbon updates
+      document.getElementById('nav-net-worth').innerText = formatUSD(netWorth);
+      document.getElementById('nav-cash').innerText = formatUSD(state.cash);
+      
+      const navPnl = document.getElementById('nav-pnl');
+      navPnl.innerText = `${formatUSD(totalReturn)} (${isProfit ? '+' : ''}${totalReturnPercent.toFixed(2)}%)`;
+      navPnl.className = `text-sm font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      // Stat Cards
+      document.getElementById('stat-net-worth').innerText = formatUSD(netWorth);
+      document.getElementById('stat-cash').innerText = formatUSD(state.cash);
+      document.getElementById('stat-cash-percent').innerText = `${netWorth > 0 ? ((state.cash / netWorth) * 100).toFixed(1) : '100'}%`;
+      
+      document.getElementById('stat-portfolio-val').innerText = formatUSD(totalPortfolioVal);
+      document.getElementById('stat-open-positions').innerText = `${openPositionsCount} Aset`;
+
+      const statTotalPnl = document.getElementById('stat-total-pnl');
+      const statPnlBadge = document.getElementById('stat-pnl-badge');
+      const statPnlIconBg = document.getElementById('stat-pnl-icon-bg');
+
+      statTotalPnl.innerText = `${isProfit ? '+' : ''}${formatUSD(totalReturn)}`;
+      statTotalPnl.className = `text-2xl font-black font-mono tracking-tight ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      statPnlBadge.innerText = `${isProfit ? '+' : ''}${totalReturnPercent.toFixed(2)}% Return Total`;
+      statPnlBadge.className = `text-xs font-bold font-mono mt-1 flex items-center gap-1 ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      statPnlIconBg.className = `w-8 h-8 rounded-lg flex items-center justify-center border ${
+        isProfit ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+      }`;
+
+      // Update Counts
+      document.getElementById('tab-portfolio-count').innerText = openPositionsCount;
+      document.getElementById('tab-history-count').innerText = state.history.length;
+      document.getElementById('stat-total-trades').innerText = `${state.history.length} Transaksi`;
+      
+      const realPnlEl = document.getElementById('stat-realized-pnl');
+      realPnlEl.innerText = `${state.realizedPnl >= 0 ? '+' : ''}${formatUSD(state.realizedPnl)}`;
+      realPnlEl.className = `text-2xl font-bold font-mono mt-1 ${state.realizedPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      document.getElementById('stat-best-asset').innerText = bestAsset || '-';
+    }
+
+    // --- 10. ORDER EXECUTION & FORM HANDLING ---
+    function setTradeMode(mode) {
+      state.tradeMode = mode;
+      const btnBuy = document.getElementById('btn-tab-buy');
+      const btnSell = document.getElementById('btn-tab-sell');
+      const execBtn = document.getElementById('btn-execute-order');
+
+      if (mode === 'BUY') {
+        btnBuy.className = 'py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5';
+        btnSell.className = 'py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all text-slate-400 hover:text-white flex items-center justify-center gap-1.5';
+        execBtn.className = 'w-full py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 active:scale-[0.98] flex items-center justify-center gap-2';
+      } else {
+        btnBuy.className = 'py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all text-slate-400 hover:text-white flex items-center justify-center gap-1.5';
+        btnSell.className = 'py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all bg-rose-500 text-white shadow-md shadow-rose-500/20 flex items-center justify-center gap-1.5';
+        execBtn.className = 'w-full py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/20 active:scale-[0.98] flex items-center justify-center gap-2';
+      }
+
+      updateOrderFormAvailableBalance();
+      updateOrderButtonLabel();
+      calculateOrderDetails();
+    }
+
+    function switchInputType(type) {
+      state.inputType = type;
+      const prefix = document.getElementById('input-prefix');
+      const label = document.getElementById('label-amount-input');
+      const input = document.getElementById('trade-amount-input');
+
+      if (type === 'USD') {
+        prefix.innerText = '$';
+        label.innerText = 'Nominal Transaksi (USD)';
+        input.placeholder = '0.00';
+      } else {
+        prefix.innerText = '#';
+        label.innerText = 'Jumlah Unit';
+        input.placeholder = '0.000000';
+      }
+      input.value = '';
+      calculateOrderDetails();
+    }
+
+    function updateOrderFormAvailableBalance() {
+      const asset = getActiveAsset();
+      const pos = state.portfolio[asset.id] || { units: 0 };
+      const labelAvail = document.getElementById('label-available-balance');
+      const valAvail = document.getElementById('val-available-balance');
+
+      if (state.tradeMode === 'BUY') {
+        labelAvail.innerText = 'Kas Tersedia (Cash):';
+        valAvail.innerText = formatUSD(state.cash);
+        valAvail.className = 'font-mono font-bold text-emerald-400';
+      } else {
+        labelAvail.innerText = `Aset Dimiliki (${asset.symbol}):`;
+        valAvail.innerText = `${formatNumber(pos.units, 6)} Unit`;
+        valAvail.className = 'font-mono font-bold text-cyan-400';
+      }
+    }
+
+    function updateOrderButtonLabel() {
+      const asset = getActiveAsset();
+      const execText = document.getElementById('btn-execute-text');
+      if (state.tradeMode === 'BUY') {
+        execText.innerText = `Beli ${asset.symbol}`;
+      } else {
+        execText.innerText = `Jual ${asset.symbol}`;
+      }
+    }
+
+    function setTradePercent(percent) {
+      const asset = getActiveAsset();
+      const pos = state.portfolio[asset.id] || { units: 0 };
+      const input = document.getElementById('trade-amount-input');
+
+      if (state.tradeMode === 'BUY') {
+        if (state.inputType === 'USD') {
+          const usdVal = state.cash * percent;
+          input.value = (Math.floor(usdVal * 100) / 100).toFixed(2);
+        } else {
+          const maxUnits = (state.cash * percent) / asset.price;
+          input.value = (Math.floor(maxUnits * 1000000) / 1000000).toFixed(6);
+        }
+      } else {
+        // SELL
+        if (state.inputType === 'USD') {
+          const totalVal = pos.units * asset.price * percent;
+          input.value = (Math.floor(totalVal * 100) / 100).toFixed(2);
+        } else {
+          const unitVal = pos.units * percent;
+          input.value = (Math.floor(unitVal * 1000000) / 1000000).toFixed(6);
+        }
+      }
+      calculateOrderDetails();
+    }
+
+    function setTradeMax() {
+      setTradePercent(1.0);
+    }
+
+    function calculateOrderDetails() {
+      const asset = getActiveAsset();
+      const pos = state.portfolio[asset.id] || { units: 0 };
+      const inputVal = parseFloat(document.getElementById('trade-amount-input').value) || 0;
+      const validationMsg = document.getElementById('order-validation-msg');
+      const marketPriceEl = document.getElementById('summary-market-price');
+      const unitsLabelEl = document.getElementById('summary-units-label');
+      const unitsValEl = document.getElementById('summary-units-val');
+      const totalCostEl = document.getElementById('summary-total-cost');
+
+      marketPriceEl.innerText = formatUSD(asset.price, asset.price < 10 ? 4 : 2);
+
+      let totalUsd = 0;
+      let units = 0;
+
+      if (state.inputType === 'USD') {
+        totalUsd = inputVal;
+        units = asset.price > 0 ? (inputVal / asset.price) : 0;
+      } else {
+        units = inputVal;
+        totalUsd = inputVal * asset.price;
+      }
+
+      unitsLabelEl.innerText = state.tradeMode === 'BUY' ? 'Estimasi Unit Didapat:' : 'Unit yang Dijual:';
+      unitsValEl.innerText = `${formatNumber(units, 6)} ${asset.symbol.split('/')[0]}`;
+      totalCostEl.innerText = formatUSD(totalUsd);
+
+      // Validation
+      validationMsg.innerText = '';
+      if (inputVal > 0) {
+        if (state.tradeMode === 'BUY') {
+          if (totalUsd > state.cash) {
+            validationMsg.innerText = '⚠️ Saldo kas tidak mencukupi untuk order ini.';
+            validationMsg.className = 'text-[11px] text-center text-rose-400 min-h-[16px] font-semibold';
+          } else {
+            validationMsg.innerText = '✓ Saldo mencukupi, siap dieksekusi.';
+            validationMsg.className = 'text-[11px] text-center text-emerald-400 min-h-[16px] font-semibold';
+          }
+        } else {
+          // SELL
+          if (units > pos.units || pos.units <= 0) {
+            validationMsg.innerText = `⚠️ Aset tidak mencukupi. Anda hanya memiliki ${formatNumber(pos.units, 6)} unit.`;
+            validationMsg.className = 'text-[11px] text-center text-rose-400 min-h-[16px] font-semibold';
+          } else {
+            validationMsg.innerText = '✓ Jumlah aset valid untuk dijual.';
+            validationMsg.className = 'text-[11px] text-center text-emerald-400 min-h-[16px] font-semibold';
+          }
+        }
+      }
+    }
+
+    function executeTradeOrder() {
+      const asset = getActiveAsset();
+      const pos = state.portfolio[asset.id] || { units: 0, totalSpent: 0, avgPrice: 0 };
+      const inputVal = parseFloat(document.getElementById('trade-amount-input').value) || 0;
+
+      if (inputVal <= 0) {
+        showToast('Masukkan jumlah/nominal transaksi yang valid', 'error');
+        playBeep('error');
+        return;
+      }
+
+      let totalUsd = 0;
+      let units = 0;
+
+      if (state.inputType === 'USD') {
+        totalUsd = inputVal;
+        units = inputVal / asset.price;
+      } else {
+        units = inputVal;
+        totalUsd = inputVal * asset.price;
+      }
+
+      if (state.tradeMode === 'BUY') {
+        // VALIDATION: Cash Check
+        if (totalUsd > state.cash + 0.001) {
+          showToast(`Saldo kas tidak cukup! Anda butuh ${formatUSD(totalUsd)}, saldo Anda ${formatUSD(state.cash)}`, 'error');
+          playBeep('error');
+          return;
+        }
+
+        // EXECUTE BUY
+        state.cash -= totalUsd;
+        
+        const currentUnits = pos.units || 0;
+        const currentTotalCost = (pos.avgPrice || 0) * currentUnits;
+        const newUnits = currentUnits + units;
+        const newAvgPrice = (currentTotalCost + totalUsd) / newUnits;
+
+        state.portfolio[asset.id] = {
+          units: newUnits,
+          avgPrice: newAvgPrice,
+          totalSpent: (pos.totalSpent || 0) + totalUsd
+        };
+
+        // Record History
+        state.history.unshift({
+          id: 'TX-' + Date.now().toString(36).toUpperCase(),
+          timestamp: new Date().toLocaleTimeString(),
+          type: 'BUY',
+          assetId: asset.id,
+          symbol: asset.symbol,
+          price: asset.price,
+          units: units,
+          totalUsd: totalUsd
+        });
+
+        playBeep('buy');
+        showToast(`Berhasil Membeli ${formatNumber(units, 4)} ${asset.symbol} senilai ${formatUSD(totalUsd)}!`, 'success');
+
+      } else {
+        // VALIDATION: Units Check
+        if (units > (pos.units + 0.0000001) || pos.units <= 0) {
+          showToast(`Gagal! Anda hanya memiliki ${formatNumber(pos.units, 6)} unit ${asset.symbol}`, 'error');
+          playBeep('error');
+          return;
+        }
+
+        // EXECUTE SELL
+        const sellUnits = Math.min(units, pos.units);
+        const revenue = sellUnits * asset.price;
+        const costBasis = sellUnits * pos.avgPrice;
+        const tradeProfit = revenue - costBasis;
+
+        state.cash += revenue;
+        state.realizedPnl += tradeProfit;
+
+        const remainingUnits = pos.units - sellUnits;
+        if (remainingUnits <= 0.000001) {
+          delete state.portfolio[asset.id];
+        } else {
+          state.portfolio[asset.id].units = remainingUnits;
+        }
+
+        // Record History
+        state.history.unshift({
+          id: 'TX-' + Date.now().toString(36).toUpperCase(),
+          timestamp: new Date().toLocaleTimeString(),
+          type: 'SELL',
+          assetId: asset.id,
+          symbol: asset.symbol,
+          price: asset.price,
+          units: sellUnits,
+          totalUsd: revenue,
+          realizedPnl: tradeProfit
+        });
+
+        playBeep('sell');
+        const profitNote = tradeProfit >= 0 ? `(Profit: +${formatUSD(tradeProfit)})` : `(Loss: ${formatUSD(tradeProfit)})`;
+        showToast(`Berhasil Menjual ${formatNumber(sellUnits, 4)} ${asset.symbol} senilai ${formatUSD(revenue)} ${profitNote}!`, 'success');
+      }
+
+      // Reset form input
+      document.getElementById('trade-amount-input').value = '';
+      saveState();
+      updateDashboardStats();
+      updateOrderFormAvailableBalance();
+      calculateOrderDetails();
+      renderPortfolioTable();
+      renderHistoryTable();
+    }
+
+    // --- 11. PORTFOLIO & HISTORY TABLES ---
+    function renderPortfolioTable() {
+      const tbody = document.getElementById('portfolio-table-body');
+      const emptyState = document.getElementById('portfolio-empty-state');
+      
+      const holdings = Object.entries(state.portfolio).filter(([_, pos]) => pos.units > 0.000001);
+
+      if (holdings.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = holdings.map(([assetId, pos]) => {
+        const asset = state.assets.find(a => a.id === assetId);
+        if (!asset) return '';
+
+        const currentPrice = asset.price;
+        const marketValue = pos.units * currentPrice;
+        const costBasis = pos.units * pos.avgPrice;
+        const pnl = marketValue - costBasis;
+        const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+        const isProfit = pnl >= 0;
+
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-3">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center font-bold text-xs text-emerald-400">
+                  ${asset.icon}
+                </span>
+                <div>
+                  <div class="font-bold text-white text-xs">${asset.symbol}</div>
+                  <div class="text-[10px] text-slate-400 font-sans">${asset.name}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 font-semibold text-slate-200">
+              ${formatNumber(pos.units, 6)}
+            </td>
+            <td class="py-3 text-slate-300">
+              ${formatUSD(pos.avgPrice, pos.avgPrice < 10 ? 4 : 2)}
+            </td>
+            <td class="py-3 font-bold text-white">
+              ${formatUSD(currentPrice, currentPrice < 10 ? 4 : 2)}
+            </td>
+            <td class="py-3 font-black text-slate-100">
+              ${formatUSD(marketValue)}
+            </td>
+            <td class="py-3 font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}">
+              ${isProfit ? '+' : ''}${formatUSD(pnl)} (${isProfit ? '+' : ''}${pnlPercent.toFixed(2)}%)
+            </td>
+            <td class="py-3 text-right">
+              <div class="flex items-center justify-end gap-1.5 font-sans">
+                <button 
+                  onclick="quickTrade('${asset.id}', 'BUY')" 
+                  class="px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold transition"
+                >
+                  Beli
+                </button>
+                <button 
+                  onclick="quickTrade('${asset.id}', 'SELL')" 
+                  class="px-2.5 py-1 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[11px] font-bold transition"
+                >
+                  Jual
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function quickTrade(assetId, mode) {
+      selectAsset(assetId);
+      setTradeMode(mode);
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    }
+
+    function renderHistoryTable() {
+      const tbody = document.getElementById('history-table-body');
+      const emptyState = document.getElementById('history-empty-state');
+
+      if (state.history.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = state.history.slice(0, 50).map(tx => {
+        const isBuy = tx.type === 'BUY';
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-3 text-slate-400 text-[11px]">${tx.timestamp}</td>
+            <td class="py-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                isBuy ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+              }">
+                ${tx.type}
+              </span>
+            </td>
+            <td class="py-3 font-bold text-white">${tx.symbol}</td>
+            <td class="py-3 text-slate-300">${formatUSD(tx.price, tx.price < 10 ? 4 : 2)}</td>
+            <td class="py-3 font-semibold text-slate-200">${formatNumber(tx.units, 6)}</td>
+            <td class="py-3 font-black text-white">${formatUSD(tx.totalUsd)}</td>
+            <td class="py-3 text-right">
+              <span class="text-[11px] text-emerald-400 font-semibold font-sans">✓ Selesai</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function switchBottomTab(tab) {
+      ['portfolio', 'history', 'analytics'].forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const panel = document.getElementById(`panel-${t}`);
+        if (t === tab) {
+          btn.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition';
+          panel.classList.remove('hidden');
+        } else {
+          btn.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition';
+          panel.classList.add('hidden');
+        }
+      });
+      if (tab === 'history') renderHistoryTable();
+      if (tab === 'portfolio') renderPortfolioTable();
+    }
+
+    function setTimeframe(tf) {
+      ['1M', '5M', '1H', '1D'].forEach(t => {
+        const btn = document.getElementById(`tf-${t}`);
+        if (btn) {
+          if (t === tf) {
+            btn.className = 'px-2.5 py-1 rounded-md font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition';
+          } else {
+            btn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition';
+          }
+        }
+      });
+      showToast(`Rentang grafik ${tf} aktif`, 'info');
+    }
+
+    // --- 12. SIMULATION CONTROLS & RESET ---
+    function setSimSpeed(speed) {
+      state.simSpeed = speed;
+      [0, 1, 2, 5].forEach(s => {
+        const btn = document.getElementById(`spd-btn-${s}`);
+        if (btn) {
+          if (s === speed) {
+            btn.className = 'px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 transition';
+          } else {
+            btn.className = 'px-2 py-1 rounded text-slate-400 hover:text-white font-medium transition';
+          }
+        }
+      });
+
+      const indicator = document.getElementById('market-update-indicator');
+      if (speed === 0) {
+        indicator.innerText = 'Simulasi: Jeda';
+      } else {
+        indicator.innerText = `Tick: ${(1.5 / speed).toFixed(1)}s`;
+      }
+
+      startPriceEngine();
+      showToast(speed === 0 ? 'Simulasi dijeda' : `Kecepatan simulasi: ${speed}x`, 'info');
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      if (state.soundEnabled) {
+        icon.setAttribute('data-lucide', 'volume-2');
+        showToast('Efek suara diaktifkan', 'info');
+      } else {
+        icon.setAttribute('data-lucide', 'volume-x');
+        showToast('Efek suara dimatikan', 'info');
+      }
+      lucide.createIcons();
+      saveState();
+    }
+
+    function confirmReset() {
+      document.getElementById('reset-modal').classList.remove('hidden');
+    }
+
+    function closeResetModal() {
+      document.getElementById('reset-modal').classList.add('hidden');
+    }
+
+    function executeResetAll() {
+      localStorage.removeItem('tradeflow_sim_state');
+      state.cash = INITIAL_MODAL;
+      state.portfolio = {};
+      state.history = [];
+      state.realizedPnl = 0;
+      state.activeAssetId = 'btc';
+
+      closeResetModal();
+      saveState();
+      updateDashboardStats();
+      updateActiveAssetHeader();
+      renderMarketWatch();
+      renderPortfolioTable();
+      renderHistoryTable();
+      showToast('Akun berhasil direset ke modal awal $10,000!', 'success');
+    }
+
+    // --- 13. TOAST NOTIFICATION SYSTEM ---
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let borderClass = 'border-slate-700 text-white';
+      let iconName = 'info';
+      if (type === 'success') {
+        borderClass = 'border-emerald-500/40 text-emerald-400 bg-emerald-950/90';
+        iconName = 'check-circle-2';
+      } else if (type === 'error') {
+        borderClass = 'border-rose-500/40 text-rose-400 bg-rose-950/90';
+        iconName = 'alert-circle';
+      } else {
+        borderClass = 'border-cyan-500/40 text-cyan-300 bg-slate-900/90';
+        iconName = 'bell';
+      }
+
+      toast.className = `p-3 rounded-xl border ${borderClass} shadow-xl backdrop-blur-md flex items-center gap-2.5 text-xs font-semibold transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+      toast.innerHTML = `
+        <i data-lucide="${iconName}" class="w-4 h-4 flex-shrink-0"></i>
+        <span class="flex-1">${message}</span>
+      `;
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // --- 14. APP INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      lucide.createIcons();
+      initChart();
+      renderMarketWatch();
+      updateActiveAssetHeader();
+      updateDashboardStats();
+      renderPortfolioTable();
+      renderHistoryTable();
+      startPriceEngine();
+    });
+  </script>
+</body>
+</html>
